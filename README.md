@@ -1,7 +1,7 @@
 ## BEViewer Build Modernisation Project
 
 ### Bugs
-* Where did the bookmarks go?
+* ~~Where did the bookmarks go?~~
 * Thread contention somewhere, sticky UI
 * Hundreds of warnings
 
@@ -19,17 +19,17 @@
     * Packaging and Releasing
   
 ### Pressing Technical Challenges
-* Deprecated internal comms with `Observable` 
-* API interaction via HTTP-ish `Process` based input/output stream handling
-* Package layout/structure - currently all in `default` package
-* Externalise logging
+* ~~Deprecated internal comms with `Observable`~~ 
+* ~~API interaction via HTTP-ish `Process` based input/output stream handling~~
+* ~~Package layout/structure - currently all in `default` package~~
+* ~~Externalise logging~~
 * Tests
     * Unit tests and/or replace with proven libraries e.g. `StringEscapeUtils`
     * Component tests to cover API interactions
 * Plan for future and broader maintenance
 
 ### Fit and Finish
-* Pick up `Flatlaf` for consistent cross-platform appearance
+* ~~Pick up `Flatlaf` for consistent cross-platform appearance~~
 * Pick up modern font handling
 * Basic i18n support
 * Flame/Heat map
@@ -81,6 +81,7 @@
 * File based logging with configurable rollover replaces in-memory boundless buffer
 * Standard package layout
 * Move from `Foo extend Thread` to Tasks running on `VirtualThread` executors.
+* API Contract
 
 ### Minor Complete
 * Colour picker for Highlight colours - user selectable
@@ -96,7 +97,8 @@
 ## Major not yet
 * Matrix builds on GitHub Actions using `jlink` to generate a minimal `JRE` and `jpackage` to generate a native executable for win/mac/linux. 
   * _No Java install will be required to run BEViewer_
-* API Contract
+* ~~API Contract~~
+* Configuration with arg override - e.g. `Port`
 * Heavy UI components which could be warmed-up before use
 * Component tests `listener -> processor -> listener`
 * Unit tests for minor logic and decision points
