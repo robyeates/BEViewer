@@ -2,6 +2,7 @@ package co.rob.state;
 
 import co.rob.api.ImageReader;
 import co.rob.api.ImageReader.ImageReaderResponse;
+import co.rob.api.generated.invoker.ApiException;
 import co.rob.pojo.FeatureLine;
 import co.rob.ui.dialog.WError;
 import co.rob.ui.dialog.WIndeterminateProgress;
@@ -39,12 +40,7 @@ public class ImageModel {
     // derived attributes that define this model
     private byte[] pageBytes = new byte[0];
     private byte[] paddedPageBytes = new byte[0];
-    private boolean[] pageHighlightFlags = new boolean[0];
-
-    private long paddedPageOffset = 0;
     private int paddingPrefixSize = 0;
-
-    private ImageReaderResponse response = new ImageReaderResponse(new byte[0], 0);
 
     // values returned by image reader thread
     private long imageSize = 0;
@@ -181,7 +177,7 @@ public class ImageModel {
 
                 // async run instead of Thread
                 readerFuture = CompletableFuture.supplyAsync(() ->
-                        ImageReaderTask.read(featureLine.featuresFile(), paddedForensicPath,
+                        ImageReaderTask.read(featureLine.actualImageFile(), paddedForensicPath,
                                 paddingPrefixSize + PAGE_SIZE + PAGE_SIZE)
                 );
 
@@ -282,21 +278,23 @@ public class ImageModel {
      * - Avoid <code>Thread</code> manual interactions
      * - Let <code>CompletableFuture</code> track all state, completion and response
      * - Consolidate error-handling in <code>ImageModel</code>
+     * TODO Fix this to make it testable
      */
     public static class ImageReaderTask {
         public static ImageReaderResponse read(File imageFile, String forensicPath, int numBytes) {
-            try (ImageReader reader = new ImageReader(imageFile)) {
-                ImageReaderResponse response = reader.read(forensicPath, numBytes);
-                if (response.bytes().length == 0) {
-                    WError.showMessageLater("No bytes were read from the image path, likely because the image file is not available.", "No Data");
-                }
-                return response;
-            } catch (Exception e) {
-                WError.showErrorLater("Unable to read the Image.\n" +
-                                "file: '" + imageFile + "' forensic path: '" + forensicPath + "'",
-                        "Error reading Image", e);
-                return new ImageReaderResponse(new byte[0], 0);
+            var imageReader = new ImageReader(imageFile);
+            ImageReaderResponse response;
+            try {
+                response = imageReader.read(forensicPath, numBytes);
+            } catch (ApiException e) {
+                logger.error("Failed to read image for [{}], [{}]", forensicPath, numBytes, e);
+                WError.showErrorLater("Unable to read image data.", "Error reading Image", e);
+                throw new RuntimeException(e);
             }
+            if (response.bytes().length == 0) {
+                WError.showMessageLater("No bytes were read from the image path, likely because the image file is not available.", "No Data");
+            }
+            return response;
         }
     }
 }

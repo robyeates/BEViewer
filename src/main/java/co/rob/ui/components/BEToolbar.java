@@ -373,6 +373,9 @@ public class BEToolbar extends JToolBar {
       //         setEnabledStates();//TODO
       //     }//TODO
       // });
+
+
+        //TODO ADD RAG FOR BE using HealthV1Api
     }
 
 
