@@ -22,6 +22,8 @@ import javax.swing.event.ListDataListener;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 /**
@@ -39,7 +41,10 @@ public class ScanSettingsConsumer {
     private static final Logger logger = LoggerFactory.getLogger(ScanSettingsConsumer.class);
 
     private static final BlockingQueue<ScanSettings> queue = new LinkedBlockingQueue<>();
-    private static final AtomicBoolean isPaused = new AtomicBoolean(false);
+
+    private static final ReentrantLock pauseLock = new ReentrantLock();
+    private static final Condition unpaused = pauseLock.newCondition();
+    private static volatile boolean isPaused = false;
 
     private final ScanSettingsListModel scanSettingsListModel;
     private final ApiClient apiClient;
@@ -74,7 +79,15 @@ public class ScanSettingsConsumer {
      * or restart the consumer.
      */
     public static void pauseConsumer(boolean doPause) {
-        isPaused.set(doPause);
+        pauseLock.lock();
+        try {
+            isPaused = doPause;
+            if (!isPaused) {
+                unpaused.signalAll(); // wake up worker immediately
+            }
+        } finally {
+            pauseLock.unlock();
+        }
     }
 
     private void consumeLoop() {
@@ -86,9 +99,13 @@ public class ScanSettingsConsumer {
                 ScanSettings scanSettings = queue.take();
 
                 // respect pause flag
-                while (isPaused.get()) {
-                    logger.debug("Consumer paused, waiting...");
-                    TimeUnit.SECONDS.sleep(1);
+                pauseLock.lock();
+                try {
+                    while (isPaused) {
+                        unpaused.await(); // block until unpaused
+                    }
+                } finally {
+                    pauseLock.unlock();
                 }
 
                 logger.info("Starting bulk_extractor run: '{}'", scanSettings.getCommandString());
