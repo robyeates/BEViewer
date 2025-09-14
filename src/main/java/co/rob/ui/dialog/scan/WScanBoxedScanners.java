@@ -1,6 +1,7 @@
 package co.rob.ui.dialog.scan;
 
-import co.rob.io.BulkExtractorScanListReader;
+import co.rob.api.BulkExtractorScanListReader;
+import co.rob.api.generated.invoker.ApiException;
 import co.rob.pojo.scan.ScanSettings;
 import co.rob.pojo.scan.Scanner;
 import co.rob.ui.dialog.WError;
@@ -9,7 +10,6 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,8 +66,8 @@ public class WScanBoxedScanners {
     private List<Scanner> getScanners() {
         List<Scanner> scanners;
         try {
-            scanners = BulkExtractorScanListReader.readScanList(wScanBoxedControls.isUsePluginDirectory(), wScanBoxedControls.getPluginDirectoriesTextFieldText());
-        } catch (IOException e) {
+            scanners = new BulkExtractorScanListReader().readScanList(WScanBoxedControls.isUsePluginDirectory(), WScanBoxedControls.getPluginDirectoriesTextFieldText());
+        } catch (ApiException e) {
             WError.showError(I18n.textFor("scanners.read.error"),I18n.textFor("scanners.read.error.dialog.title"), e);
             scanners = new ArrayList<>();
         }

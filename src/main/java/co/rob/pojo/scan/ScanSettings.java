@@ -1,6 +1,7 @@
 package co.rob.pojo.scan;
 
-import co.rob.io.BulkExtractorScanListReader;
+import co.rob.api.BulkExtractorScanListReader;
+import co.rob.api.generated.invoker.ApiException;
 import co.rob.pojo.ImageSourceType;
 import co.rob.ui.dialog.WError;
 import co.rob.ui.dialog.scan.WScanBoxedControls;
@@ -8,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Vector;
@@ -80,7 +80,7 @@ public class ScanSettings {
     public String settableOptions;
 
     // scanners
-    private List<Scanner> scanners;
+    public List<Scanner> scanners;
 
     // parse state
     public boolean validTokens = true;
@@ -149,10 +149,10 @@ public class ScanSettings {
         // scanners
         try {
             // get the default scanner list from bulk_extractor
-            scanners = BulkExtractorScanListReader.readScanList(
+            scanners = new BulkExtractorScanListReader().readScanList(
                     WScanBoxedControls.isUsePluginDirectory(),
                     WScanBoxedControls.getPluginDirectoriesTextFieldText());
-        } catch (IOException e) {
+        } catch (ApiException e) {
             WError.showError("""
                     Error in obtaining list of scanners from bulk_extractor.
                     Bulk_extractor is not available during this session.
@@ -166,6 +166,7 @@ public class ScanSettings {
      */
     public ScanSettings(ScanSettings scanSettings) {
 
+        validTokens = scanSettings.validTokens;//was missing previously?
         // required parameters
         imageSourceType = scanSettings.imageSourceType;
         inputImage = scanSettings.inputImage;

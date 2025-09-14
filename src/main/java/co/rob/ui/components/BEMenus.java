@@ -3,6 +3,7 @@ package co.rob.ui.components;
 import co.rob.BEViewer;
 import co.rob.DaggerContext;
 import co.rob.api.BulkExtractorVersionReader;
+import co.rob.api.generated.invoker.ApiException;
 import co.rob.pojo.FeatureLine;
 import co.rob.pojo.scan.ScanSettings;
 import co.rob.state.*;
@@ -715,13 +716,17 @@ public class BEMenus extends JMenuBar {
       // help|Check Versions
       checkBulkExtractorVersionMenuItem = new JMenuItem("Check Bulk Extractor Version ");
       help.add(checkBulkExtractorVersionMenuItem);
-      checkBulkExtractorVersionMenuItem.addActionListener(_ -> {
-          try (var bulkExtractorVersionReader = new BulkExtractorVersionReader()) {
-              bulkExtractorVersionReader.displayVersion();
-          } catch (Exception ex) {
-              WError.showError("Unable to display version information",
-                      "BEViewer Read error", ex);
+      checkBulkExtractorVersionMenuItem.addActionListener(_ ->  {
+          String version;
+          try {
+              version = new BulkExtractorVersionReader().getVersion();
+          } catch (ApiException e) {
+              throw new RuntimeException(e);
           }
+          WError.showMessageLater("Versions:\nBulk Extractor Viewer: " + VersionInformation.getVersion() +
+                          "\nbulk_extractor: " + version,
+                  "Version Information");
+
       });
 
       // help|<separator>

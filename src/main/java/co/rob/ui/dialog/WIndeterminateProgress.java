@@ -7,6 +7,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -21,11 +25,17 @@ public class WIndeterminateProgress {
     private static final Logger logger = LoggerFactory.getLogger(WIndeterminateProgress.class);
 
     private static final int DELAY = 300; // ms
-    private DelayerThread delayerThread;
+    private static final ScheduledExecutorService scheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "WIndeterminateProgress-Scheduler");
+                t.setDaemon(true);
+                return t;
+            });
     private final AtomicBoolean active = new AtomicBoolean(false);    // synchronized
 
     private final JDialog window;
     private final JLabel label = new JLabel();
+    private ScheduledFuture<?> scheduledShow;
 
     /**
      * Creates a pop-up window for showing image reader progress.
@@ -93,9 +103,16 @@ public class WIndeterminateProgress {
             // throw new RuntimeException("invalid state");
         } else {
             // set active and set thread to show progress after delay
-            active.getAndSet(true);
-            delayerThread = new DelayerThread();
-            delayerThread.start();
+            active.set(true);
+            // schedule showing the window after DELAY
+            scheduledShow = scheduler.schedule(() -> {
+                if (active.get()) {
+                    SwingUtilities.invokeLater(() -> {
+                        window.setLocation(BEViewer.getBEWindowLocation());
+                        window.setVisible(true);
+                    });
+                }
+            }, DELAY, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -103,52 +120,22 @@ public class WIndeterminateProgress {
      * Closes the progress window.
      */
     public synchronized void stopProgress() {
-        // validate state
         if (!active.get()) {
-            throw new RuntimeException("invalid state");
+            throw new IllegalStateException("Progress not active");
         }
 
-        // signal this thread to leave this window alone
-        delayerThread.cancel();
+        if (scheduledShow != null) {
+            scheduledShow.cancel(false);
+            scheduledShow = null;
+        }
 
-        // hide the window
         SwingUtilities.invokeLater(() -> window.setVisible(false));
-
-        // release the lock
-        // TODO locking review...
-        active.getAndSet(false);
+        active.set(false);
     }
 
-    // set visibility after DELAY
-    private class DelayerThread extends Thread {
-        private boolean isCancelled = false;
-
-        public synchronized void cancel() {
-            isCancelled = true;
-        }
-
-        public synchronized void maybeShowWindow() {
-            if (!isCancelled) {
-                // show the window
-                SwingUtilities.invokeLater(() -> {
-                    window.setLocation(BEViewer.getBEWindowLocation());
-                    window.setVisible(true);
-                });
-            }
-        }
-
-        // run the delayer thread
-        public void run() {
-            // perform the delay
-            try {
-                sleep(DELAY);
-            } catch (InterruptedException e) {
-                logger.warn("WIndeterminateProgress DelayerThread interrupt");
-            }
-
-            // show the window
-            maybeShowWindow();
-        }
+    /** Shutdown the executor globally if needed */
+    public static void shutdownScheduler() {
+        scheduler.shutdown();
     }
 }
 
