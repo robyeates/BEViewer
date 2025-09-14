@@ -1,0 +1,507 @@
+openapi: 3.1.0
+info:
+  title: Bulk Extractor API
+  description: |
+    API contract for Bulk Extractor.  
+    Provides a stable interface between the C++ backend and clients (Swing UI, future React frontend).
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8080/v1
+
+paths:
+  #BulkExtractorVersionReader
+  /health/v1:
+    get:
+      summary: Health check / version endpoint
+      operationId: getHealthV1
+      tags: [health-v1]
+      description: |
+        Used by clients to verify connectivity and display status (e.g., RAG indicator in UI).
+        Returns version information for bulk_extractor.
+      responses:
+        "200":
+          description: Service is healthy, Bulk Extractor is reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponseV1"
+        "503":
+          description: Service is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #ImageReader
+  /images/read/v1:
+    get:
+      summary: Read bytes from an image path
+      operationId: readImageV1
+      tags: [read-image-v1]
+      description: |
+        Reads a range of bytes from the given forensic path inside the image.  
+        This is the HTTP-native form of what the `ImageReader` class currently does via stdio.
+      parameters:
+        - in: query
+          name: forensicPath
+          required: true
+          schema:
+            type: string
+          description: Path within the forensic image (e.g., sector offset, scanner path).
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+          description: Starting offset (default - 0).
+        - in: query
+          name: length
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          description: Number of bytes to read.
+      responses:
+        "200":
+          description: Successfully read bytes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageReaderResponseV1'
+        "400":
+          description: Bad request (invalid path, range, or params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+        "404":
+          description: Path not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #Addition - get metadata for image
+  /images/info/v1:
+    get:
+      summary: Get metadata for an image
+      operationId: getImageInfoV1
+      tags: [get-image-info-v1]
+      description: |
+        Returns basic information about an image file such as size and filename.  
+        This wraps the existing `/info` handling in `path_printer.cpp`.
+      parameters:
+        - in: query
+          name: imagePath
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image info retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageInfoResponseV1"
+        "404":
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #BulkExtractorScanListReader
+  /scanners/v1:
+    get:
+      summary: List available scanners
+      operationId: getScannersV1
+      tags: [scanners-v1]
+      description: |
+        Enumerates available scanners and whether they are enabled by default.
+        This replaces the current `BulkExtractorScanListReader` logic that parses `bulk_extractor -h`.
+      parameters:
+        - in: query
+          name: pluginDirectories
+          required: false
+          schema:
+            type: string
+            description: Pipe-separated list of plugin directories.
+      responses:
+        "200":
+          description: Scanners retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerListResponseV1"
+        "500":
+          description: Failed to enumerate scanners
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #ScanSettingsConsumer
+  /scans/v1:
+    post:
+      summary: Start a new bulk_extractor scan
+      operationId: startScanV1
+      tags: [scans-v1]
+      description: |
+        Starts a scan with the given settings.  
+        Returns a scan identifier that can be polled for progress or used to retrieve results.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanSettingsV1"
+      responses:
+        "202":
+          description: Scan accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanAcceptedResponseV1"
+        "400":
+          description: Invalid scan settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #ScanSettingsConsumer
+  /scans/{scanId}/status/v1:
+    get:
+      summary: Get scan status
+      operationId: getScanStatusV1
+      tags: [get-scan-status-v1]
+      description: |
+        Retrieve progress or completion state for a running scan.
+      parameters:
+        - in: path
+          name: scanId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scan status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanStatusResponseV1"
+        "404":
+          description: Scan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #ScanSettingsConsumer - TODO - TODO component as well
+  /scans/{scanId}/results/v1:
+    get:
+      summary: Get scan results
+      operationId: getScanResultsV1
+      tags: [get-scan-results-v1]
+      description: |
+        Retrieve results of a completed scan.  
+        TODO: Define proper response schema (e.g., feature files, JSON summaries, etc).
+      parameters:
+        - in: path
+          name: scanId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scan results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResultsResponseV1"
+        "404":
+          description: Scan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+  #Addition - cancel running scan
+  /scans/{scanId}/v1:
+    delete:
+      summary: Cancel a running scan
+      operationId: cancelScanV1
+      tags: [cancel-scan-v1]
+      description: |
+        Attempts to stop a running scan.  
+        Current implementation force-terminates the underlying process.  
+        In the future this may support more graceful cancellation.
+      parameters:
+        - in: path
+          name: scanId
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelResponseV1"
+        "404":
+          description: Scan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponseV1"
+
+
+components:
+  schemas:
+    HealthResponseV1:
+      type: object
+      required:
+        - status
+        - bulk_extractorVersion
+      properties:
+        status:
+          type: string
+          enum: [green, amber, red]
+          description: Overall service status (for UI RAG display).
+        bulk_extractorVersion:
+          type: string
+          description: Version string from bulk_extractor (e.g., "1.6.0").
+
+    ImageReaderResponseV1:
+      type: object
+      required:
+        - bytes
+        - totalSizeAtPath
+      properties:
+        bytes:
+          type: string
+          format: byte
+          description: The requested byte range (base64 encoded).
+        totalSizeAtPath:
+          type: integer
+          format: int64
+          description: Total size available at the forensic path.
+
+    ScanSettingsV1:
+      type: object
+      required:
+        - imageSourceType
+        - inputImage
+        - outdir
+      properties:
+        imageSourceType:
+          type: string
+          enum: [IMAGE_FILE, RAW_DEVICE, DIRECTORY_OF_FILES]
+        inputImage:
+          type: string
+          description: Path to the input image or directory.
+        outdir:
+          type: string
+          description: Output directory for scan results.
+        useBannerFile:
+          type: boolean
+        bannerFile:
+          type: string
+        useAlertlistFile:
+          type: boolean
+        alertlistFile:
+          type: string
+        useStoplistFile:
+          type: boolean
+        stoplistFile:
+          type: string
+        useFindRegexTextFile:
+          type: boolean
+        findRegexTextFile:
+          type: string
+        useFindRegexText:
+          type: boolean
+        findRegexText:
+          type: string
+        useRandomSampling:
+          type: boolean
+        randomSampling:
+          type: string
+        useContextWindowSize:
+          type: boolean
+        contextWindowSize:
+          type: string
+        usePageSize:
+          type: boolean
+        pageSize:
+          type: string
+        useMarginSize:
+          type: boolean
+        marginSize:
+          type: string
+        useBlockSize:
+          type: boolean
+        blockSize:
+          type: string
+        useNumThreads:
+          type: boolean
+        numThreads:
+          type: string
+        useMaxRecursionDepth:
+          type: boolean
+        maxRecursionDepth:
+          type: string
+        useMaxWait:
+          type: boolean
+        maxWait:
+          type: string
+        useStartProcessingAt:
+          type: boolean
+        startProcessingAt:
+          type: string
+        useProcessRange:
+          type: boolean
+        processRange:
+          type: string
+        useAddOffset:
+          type: boolean
+        addOffset:
+          type: string
+        useStartOnPageNumber:
+          type: boolean
+        startOnPageNumber:
+          type: string
+        useDebugNumber:
+          type: boolean
+        debugNumber:
+          type: string
+        useEraseOutputDirectory:
+          type: boolean
+        usePluginDirectories:
+          type: boolean
+        pluginDirectories:
+          type: string
+        useSettableOptions:
+          type: boolean
+        settableOptions:
+          type: string
+        scanners:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScannerV1"
+
+    ScannerV1:
+      type: object
+      required:
+        - name
+        - defaultUse
+        - enabled
+      properties:
+        name:
+          type: string
+        defaultUse:
+          type: boolean
+          description: Whether the scanner is enabled by default.
+        enabled:
+          type: boolean
+          description: Whether this scan run enables the scanner.
+
+    ScanAcceptedResponseV1:
+      type: object
+      required:
+        - scanId
+      properties:
+        scanId:
+          type: string
+          description: Identifier for the submitted scan.
+
+    ScanStatusResponseV1:
+      type: object
+      required:
+        - scanId
+        - state
+      properties:
+        scanId:
+          type: string
+        state:
+          type: string
+          enum: [QUEUED, RUNNING, COMPLETED, FAILED, CANCELED]
+        progress:
+          type: number
+          format: float
+          description: Progress percentage (0–100).
+        message:
+          type: string
+          description: Optional status or error message.
+
+    #TODO
+    ScanResultsResponseV1:
+      type: object
+      description: |
+        TODO: Define scan results format.  
+        Placeholder object for now.
+      properties: { }
+      additionalProperties: true
+
+    ScannerListResponseV1:
+      type: object
+      required:
+        - scanners
+      properties:
+        scanners:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScannerV1"
+
+      ScannerV1:
+        type: object
+        required:
+          - name
+          - defaultUse
+        properties:
+          name:
+            type: string
+            description: Scanner name
+          defaultUse:
+            type: boolean
+            description: Whether this scanner is enabled by default
+
+    CancelResponseV1:
+      type: object
+      required:
+        - scanId
+        - state
+      properties:
+        scanId:
+          type: string
+        state:
+          type: string
+          enum: [CANCELED, FAILED]
+        message:
+          type: string
+
+    ImageInfoResponseV1:
+      type: object
+      required:
+        - imageSize
+        - imageFilename
+      properties:
+        imageSize:
+          type: integer
+          format: int64
+        imageFilename:
+          type: string
+
+    ErrorResponseV1:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Error details
